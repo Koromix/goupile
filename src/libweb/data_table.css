@@ -1,0 +1,65 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+   License, v. 2.0. If a copy of the MPL was not distributed with this
+   file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+.dtab_count {
+    margin: 3px;
+    font-size: 0.9em;
+    font-style: italic;
+    color: #777;
+}
+
+.dtab_table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.dtab_table thead { background: #ccc; }
+.dtab_table tbody { background: #fafafa; }
+.dtab_table th, .dtab_table td {
+    min-width: 60px;
+    max-width: 260px;
+    border: 1px solid #a4a4a4;
+    padding: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dtab_table th {
+    cursor: pointer;
+    text-align: center;
+    font-weight: bold;
+}
+.dtab_table .parent { background: #eee; }
+
+.dtab_table .ascending {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAFCAYAAABxeg0vAAAAOUlEQVQImWNgwARODAwM8VjEsYIkBgaGXwwMDP8ZGBjSCClOgypExjg1YVOMU5MtAwPDGQLYFqYYAH3dFcttYcRhAAAAAElFTkSuQmCC');
+    background-repeat: no-repeat;
+    background-position: right center;
+}
+.dtab_table .descending {
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAFCAYAAABxeg0vAAAANklEQVQImWNgYGCwZWBgOEMA2zKggTQGBob/OHAaumJ8mnAqhoEkBgaGX8QqhgEnBgaGeFySAMvFFcvEu6Q2AAAAAElFTkSuQmCC');
+    background-repeat: no-repeat;
+    background-position: right center;
+}
+
+@media screen and (min-width: 801px) {
+    .dtab_count { float: left; }
+    .dtab_excel {
+        display: block;
+        float: right;
+        width: 16px;
+        height: 16px;
+        background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAABrUlEQVQokWNgwA4YGbK0ebBLpRmzypY46MgWOYfLFbm2yRW7bFEod78vU+BwiMGTX5nBiUGZIUAMQhszsDLIFDp7KNZ4/les8vyvWO35X77C/b9EocN/h/aE//MPrfuz4vi2P3MPrPmz4tyOP2aNoYEMUkWOfsq13v+l8x3+i+bY/Fcucf8vU+D0X78m8H/agsb/C49u/B82rej/yWdX/0dOK4phkC5y9hEvdfxfu3bS//KVvf87t879L5Bp8V+vOuB/8tza/zP2rfwfMqXg/757Z/6HTS2IZJAucvYRLbb/HzGt5P/3Xz//u3Qm/xeEakiYU/1/2t4V/4Mm5f3fe/f0/7CpxRANIkV2/7MWNv1/8/n9/8hpJf/5M8z/61b5/4+dWfF/yp5l//0mZP/fc+cUVEO+g49Mhev/wmUd/yOmlfxv3zL7v3CW1X+96oD/ibMhNgRPzv+/7+5piJOkilz9lGq9/4vm2PwXzbH5L5Xv8F8W6unU+fX/FxzZ8D9kauH/E0+hnkYOVqVqr/+KlR7wYF1waN2flejByhCqzSZT6KJLdMThShqiOJIGADXf7VjCuLmEAAAAAElFTkSuQmCC');
+        background-repeat: no-repeat;
+        background-position: center bottom;
+    }
+}
+
+@media screen and (max-width: 800px) {
+    .dtab_excel { display: none; }
+
+    .dtab_table th, .dtab_table td {
+        font-size: 0.8em;
+        border: 0;
+    }
+}
