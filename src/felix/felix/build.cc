@@ -6,7 +6,7 @@
     #include <unistd.h>
 #endif
 
-#include "../libcc/libcc.hh"
+#include "../../libcc/libcc.hh"
 #include "build.hh"
 
 // TODO: Support Make escaping
