@@ -14,13 +14,32 @@
 #pragma once
 
 #include "../../core/libcc/libcc.hh"
-#include "../../core/libnet/libnet.hh"
 
 namespace RG {
 
-class InstanceHolder;
+struct smtp_Config {
+    const char *url = nullptr;
+    const char *username = nullptr;
+    const char *password = nullptr;
+    const char *from = nullptr;
 
-void HandleRecordLoad(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io);
-void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io);
+    bool Validate() const;
+};
+
+struct smtp_MailContent {
+    const char *subject = nullptr;
+    const char *text = nullptr;
+    const char *html = nullptr;
+};
+
+class smtp_Sender {
+    smtp_Config config;
+
+    BlockAllocator str_alloc;
+
+public:
+    bool Init(const smtp_Config &config);
+    bool Send(const char *to, const smtp_MailContent &content);
+};
 
 }

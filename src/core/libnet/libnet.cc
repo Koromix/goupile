@@ -11,16 +11,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see https://www.gnu.org/licenses/.
 
-#pragma once
-
-#include "../../core/libcc/libcc.hh"
-#include "../../core/libnet/libnet.hh"
-
-namespace RG {
-
-class InstanceHolder;
-
-void HandleRecordLoad(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io);
-void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io);
-
-}
+#include "http.cc"
+#include "http_misc.cc"
+#include "http_session.cc"
+#include "sms.cc"
+#include "smtp.c"
