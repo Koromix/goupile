@@ -11,24 +11,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see https://www.gnu.org/licenses/.
 
-goupile_repo: https://framagit.org/interhop/goupile.git
-goupile_commit: master
-goupile_root_path: /opt/goupile # Installation directory
-goupile_run_user: goupile # POSIX user that will run goupile services
-goupile_run_group: goupile # POSIX group that will run goupile services
+global:
+  scrape_interval: 1m
+  evaluation_interval: 1m
 
-goupile_sandbox: yes
-goupile_default_username: admin # Default admin username and password for newly created goupile domains
-goupile_default_password: rygel!16/default_pwd
-
-# goupile_smtp:
-  # url:
-  # username:
-  # password:
-  # from:
-
-# goupile_sms:
-  # provider: Twilio
-  # auth_id:
-  # auth_token:
-  # from:
+scrape_configs:
+{% for pkg in prometheus_packages %}
+  - job_name: {{ pkg.name }}
+    scheme: https
+    metrics_path: metrics/{{ pkg.name }}
+    tls_config:
+      insecure_skip_verify: true
+    static_configs:
+      - targets:
+{% for vars in hostvars.values() %}
+{% if vars.prometheus_domain is defined and pkg.name in vars.prometheus_exporters %}
+          - {{ vars.prometheus_domain }}
+{% endif %}
+{% endfor %}
+{% endfor %}

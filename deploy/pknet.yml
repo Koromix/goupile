@@ -11,24 +11,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see https://www.gnu.org/licenses/.
 
-goupile_repo: https://framagit.org/interhop/goupile.git
-goupile_commit: master
-goupile_root_path: /opt/goupile # Installation directory
-goupile_run_user: goupile # POSIX user that will run goupile services
-goupile_run_group: goupile # POSIX group that will run goupile services
+- name: pknet
 
-goupile_sandbox: yes
-goupile_default_username: admin # Default admin username and password for newly created goupile domains
-goupile_default_password: rygel!16/default_pwd
+  hosts: all
 
-# goupile_smtp:
-  # url:
-  # username:
-  # password:
-  # from:
-
-# goupile_sms:
-  # provider: Twilio
-  # auth_id:
-  # auth_token:
-  # from:
+  roles:
+    - name: base
+    - name: nginx
+      when: 'nginx_domains is defined'
+    - name: goupile
+      when: 'goupile_domains is defined'
+    - name: prometheus
+      when: 'prometheus_exporters is defined or prometheus_url is defined'
