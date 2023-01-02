@@ -74,7 +74,7 @@ function InstanceController() {
 
     async function openInstanceDB() {
         let db_name = `goupile:${ENV.urls.instance}`;
-        db = await indexeddb.open(db_name, 10, (db, old_version) => {
+        db = await indexeddb.open(db_name, 11, (db, old_version) => {
             switch (old_version) {
                 case null: {
                     db.createStore('usr_profiles');
@@ -111,6 +111,9 @@ function InstanceController() {
                 case 9: {
                     db.deleteStore('fs_files');
                     db.createStore('fs_changes');
+                } // fallthrough
+                case 10: {
+                    db.createStore('rec_tags');
                 } // fallthrough
             }
         });
@@ -629,6 +632,7 @@ function InstanceController() {
                                                 return html`
                                                     <td class=${active && page === route.page ? 'saved active' : 'saved'} title=${tooltip}>
                                                         <a href=${url}>${status.mtime.toLocaleDateString()}</a>
+                                                        ${renderTags(status.tags)}
                                                     </td>`;
                                             } else {
                                                 return html`<td class=${active && page === route.page ? 'missing active' : 'missing'}
@@ -648,6 +652,7 @@ function InstanceController() {
                                                 return html`
                                                     <td class=${active && route.form.chain.includes(form) ? 'saved active' : 'saved'} title=${tooltip}>
                                                         <a href=${url}>${status.mtime.toLocaleDateString()}</a>
+                                                        ${renderTags(status.tags)}
                                                     </td>`;
                                             } else {
                                                 let url = form.url + `/${row.ulid}`;
@@ -684,6 +689,11 @@ function InstanceController() {
                 </div>
             </div>
         `;
+    }
+
+    function renderTags(tags) {
+        tags = tags || [];
+        return tags.map(tag => html` <span class="ui_tag" style=${'background: ' + tag.color + ';'}>${tag.type}</span>`);
     }
 
     function computeHidWidth(hid) {
@@ -838,12 +848,31 @@ function InstanceController() {
                 }
             }
 
+            form_tags = [];
+
             let meta = Object.assign({}, form_record);
             runCodeSync('Formulaire', code, {
                 app: app,
 
                 form: form_builder,
-                meta: meta,
+                meta: {
+                    ...meta,
+
+                    tag: (type, color) => {
+                        let tag = {
+                            type: type,
+                            color: color
+                        };
+
+                        let prev_idx = form_tags.findIndex(it => it.type == tag.type);
+
+                        if (prev_idx < 0) {
+                            form_tags.push(tag);
+                        } else {
+                            form_tags[prev_idx] = tag;
+                        }
+                    }
+                },
                 forms: meta.forms,
                 values: form_state.values,
 
@@ -1267,6 +1296,7 @@ function InstanceController() {
                 let ulid = record.ulid;
                 let page_key = page.key;
                 let ptr = values[record.form.key];
+                let tags = form_tags;
 
                 await db.transaction('rw', ['rec_records'], async t => {
                     do {
@@ -1278,7 +1308,8 @@ function InstanceController() {
                                 mtime: new Date,
                                 fs: ENV.version,
                                 page: page_key,
-                                values: ptr
+                                values: ptr,
+                                tags: tags
                             };
                         } else {
                             fragment = null;
@@ -1340,6 +1371,7 @@ function InstanceController() {
                             if (record == null)
                                 break;
                             ptr = form_values[record.form.key];
+                            tags = record.tags;
                         } while (record.saved && ptr == null);
                     } while (record != null);
                 });
@@ -2328,6 +2360,7 @@ function InstanceController() {
             status: {},
             saved: false,
             values: {},
+            tags: [],
 
             parent: null,
             children: {},
@@ -2516,6 +2549,7 @@ function InstanceController() {
         }
 
         let values = {};
+        let tags = [];
         let status = {};
         for (let i = 0; i < version; i++) {
             let fragment = fragments[i];
@@ -2527,12 +2561,18 @@ function InstanceController() {
                     if (status[fragment.page] == null) {
                         status[fragment.page] = {
                             ctime: new Date(fragment.mtime),
-                            mtime: null
+                            mtime: null,
+                            tags: tags
                         };
                     }
 
                     status[fragment.page].mtime = new Date(fragment.mtime);
                 }
+            }
+
+            if (fragment.tags != null) {
+                tags.length = 0;
+                tags.push(...fragment.tags);
             }
         }
         for (let fragment of fragments)
@@ -2554,9 +2594,12 @@ function InstanceController() {
 
                 array.push(child);
 
+                console.log('X', child);
+
                 status[child.form] = {
                     ctime: child.ctime,
-                    mtime: child.mtime
+                    mtime: child.mtime,
+                    tags: await getTags(child.ulid)
                 };
             }
         }
@@ -2573,6 +2616,7 @@ function InstanceController() {
             status: status,
             saved: true,
             values: values,
+            tags: tags,
 
             parent: entry.parent,
             children: children_map,
@@ -2580,6 +2624,8 @@ function InstanceController() {
             map: null, // Will be set later
             siblings: null // Same, for multi-children only
         };
+
+        console.log(record);
 
         return record;
     }
@@ -2619,6 +2665,13 @@ function InstanceController() {
         } else {
             return null;
         }
+    }
+
+    async function getTags(ulid) {
+        let tags = await db.load('rec_tags', ulid);
+        if (tags == null)
+            tags = [];
+        return tags;
     }
 
     // Assumes from != to
@@ -2724,7 +2777,8 @@ function InstanceController() {
                                     fs: (fragment.fs != null) ? fragment.fs : ENV.version, // Use ENV.version for transition,
                                                                                            // will be removed eventually
                                     page: fragment.page,
-                                    json: JSON.stringify(fragment.values)
+                                    json: JSON.stringify(fragment.values),
+                                    tags: JSON.stringify(fragment.tags || [])
                                 }))
                             };
 
@@ -2839,7 +2893,8 @@ function InstanceController() {
                                     mtime: new Date(fragment.mtime),
                                     fs: fragment.fs,
                                     page: fragment.page,
-                                    values: fragment.values
+                                    values: fragment.values,
+                                    tags: fragment.tags
                                 };
                                 return frag;
                             })
@@ -2847,6 +2902,13 @@ function InstanceController() {
 
                         obj.enc = await goupile.encryptSymmetric(entry, 'records');
                         await db.saveWithKey('rec_records', key, obj);
+
+                        if (entry.fragments.length && entry.fragments[entry.fragments.length - 1].tags != null) {
+                            let tags = entry.fragments[entry.fragments.length - 1].tags;
+                            await db.saveWithKey('rec_tags', entry.ulid, tags);
+                        } else {
+                            await db.delete('rec_tags', entry.ulid);
+                        }
 
                         changed = true;
                     }
