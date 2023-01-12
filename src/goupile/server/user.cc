@@ -519,7 +519,7 @@ void HandleSessionLogin(InstanceHolder *instance, const http_RequestInfo &reques
                 RetainPtr<SessionInfo> session;
                 if (!confirm) {
                     session = CreateUserSession(SessionType::Login, userid, username, local_key);
-                } else if (TestStr(confirm, "TOTP")) {
+                } else if (TestStr(confirm, "TOTP") || TestStr(confirm, "totp")) {
                     if (secret) {
                         if (strlen(secret) >= RG_SIZE(SessionInfo::secret)) {
                             // Should never happen, but let's be careful
