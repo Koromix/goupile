@@ -2598,8 +2598,6 @@ function InstanceController() {
 
                 array.push(child);
 
-                console.log('X', child);
-
                 status[child.form] = {
                     ctime: child.ctime,
                     mtime: child.mtime,
