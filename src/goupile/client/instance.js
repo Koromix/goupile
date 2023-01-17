@@ -851,29 +851,28 @@ function InstanceController() {
 
             form_tags = [];
 
-            let meta = Object.assign({}, form_record);
+            let meta = Object.assign({}, form_record, {
+                tag: (type, color) => {
+                    let tag = {
+                        type: type,
+                        color: color
+                    };
+
+                    let prev_idx = form_tags.findIndex(it => it.type == tag.type);
+
+                    if (prev_idx < 0) {
+                        form_tags.push(tag);
+                    } else {
+                        form_tags[prev_idx] = tag;
+                    }
+                }
+            });
+
             runCodeSync('Formulaire', code, {
                 app: app,
 
                 form: form_builder,
-                meta: {
-                    ...meta,
-
-                    tag: (type, color) => {
-                        let tag = {
-                            type: type,
-                            color: color
-                        };
-
-                        let prev_idx = form_tags.findIndex(it => it.type == tag.type);
-
-                        if (prev_idx < 0) {
-                            form_tags.push(tag);
-                        } else {
-                            form_tags[prev_idx] = tag;
-                        }
-                    }
-                },
+                meta: meta,
                 forms: meta.forms,
                 values: form_state.values,
 
@@ -933,6 +932,7 @@ function InstanceController() {
                     }
                 }
             });
+
             new_hid = meta.hid;
 
             form_builder.popOptions({});
