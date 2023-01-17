@@ -2627,8 +2627,6 @@ function InstanceController() {
             siblings: null // Same, for multi-children only
         };
 
-        console.log(record);
-
         return record;
     }
 
