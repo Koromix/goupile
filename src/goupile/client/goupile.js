@@ -597,7 +597,7 @@ const goupile = new function() {
             let online = net.isOnline() && util.getCookie('session_rnd') != null;
             await controller.runTasks(online);
         } catch (err) {
-            console.log(err);
+            log.error(err);
         }
     }
 
