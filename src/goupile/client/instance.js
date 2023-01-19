@@ -2746,13 +2746,12 @@ function InstanceController() {
     }
 
     async function syncRecords(standalone = true, full = false) {
-        standalone &= (form_record != null);
-
         await mutex.run(async () => {
             let progress = standalone ? log.progress('Synchronisation en cours') : null;
 
             try {
-                let changed = false;
+                let saved = false;
+                let loaded = false;
 
                 // Upload new fragments
                 {
@@ -2836,6 +2835,8 @@ function InstanceController() {
                             let err = await net.readError(response);
                             throw new Error(err);
                         }
+
+                        saved = true;
                     }
                 }
 
@@ -2910,17 +2911,21 @@ function InstanceController() {
                             await db.delete('rec_tags', entry.ulid);
                         }
 
-                        changed = true;
+                        loaded = true;
                     }
 
                     // Detect changes from other tabs
                     if (prev_anchor != null && anchor !== prev_anchor)
-                        changed = true;
+                        loaded = true;
                     prev_anchor = anchor;
                 }
 
-                if (changed && standalone) {
-                    progress.success('Synchronisation effectuée');
+                if (loaded && standalone) {
+                    if (form_record != null || saved) {
+                        progress.success('Synchronisation effectuée');
+                    } else {
+                        progress.close();
+                    }
 
                     if (form_record != null) {
                         data_rows = null;
