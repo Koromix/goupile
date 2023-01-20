@@ -1379,6 +1379,7 @@ void HandleInstanceConfigure(const http_RequestInfo &request, http_IO *io)
 
         // Parse new configuration values
         decltype(InstanceHolder::config) config = instance->config;
+        int64_t fs_version = -1;
         {
             bool valid = true;
             char buf[128];
@@ -1424,6 +1425,10 @@ void HandleInstanceConfigure(const http_RequestInfo &request, http_IO *io)
                 valid &= ParseBool(str2, &config.allow_guests);
             }
 
+            if (const char *str = values.FindValue("fs_version", nullptr); str) {
+                valid &= ParseInt(str, &fs_version);
+            }
+
             if (!valid) {
                 io->AttachError(422);
                 return;
@@ -1451,6 +1456,23 @@ void HandleInstanceConfigure(const http_RequestInfo &request, http_IO *io)
                 success &= instance->db->Run(sql, "TokenKey", config.token_key);
                 success &= instance->db->Run(sql, "AutoKey", config.auto_key);
                 success &= instance->db->Run(sql, "AllowGuests", 0 + config.allow_guests);
+
+                if (fs_version >= 0) {
+                    success &= instance->db->Run(sql, "FsVersion", fs_version);
+
+                    // Copy to test version
+                    if (!instance->db->Run(R"(UPDATE fs_versions SET mtime = copy.mtime,
+                                                                     userid = copy.userid,
+                                                                     username = copy.username
+                                                  FROM (SELECT mtime, userid, username FROM fs_versions WHERE version = ?1) AS copy)",
+                                           fs_version))
+                        return false;
+                    if (!instance->db->Run(R"(DELETE FROM fs_index WHERE version = 0)"))
+                        return false;
+                    if (!instance->db->Run(R"(INSERT INTO fs_index (version, filename, sha256)
+                                                  SELECT 0, filename, sha256 FROM fs_index WHERE version = ?1)", fs_version))
+                        return false;
+                }
             }
             if (!instance->slaves.len) {
                 success &= instance->db->Run(sql, "SharedKey", config.shared_key);
@@ -1534,6 +1556,7 @@ void HandleInstanceList(const http_RequestInfo &request, http_IO *io)
                 json.Key("auto_key"); json.String(instance->config.auto_key);
             }
             json.Key("allow_guests"); json.Bool(instance->config.allow_guests);
+            json.Key("fs_version"); json.Int64(instance->fs_version);
         json.EndObject();
 
         json.EndObject();
