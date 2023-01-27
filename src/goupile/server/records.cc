@@ -435,18 +435,36 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
 
                 // Insert or update record entry (if needed)
                 if (RG_LIKELY(updated)) {
-                    if (!instance->db->Run(R"(INSERT INTO rec_entries (ulid, sequence, hid, form, parent_ulid,
+                    sq_Statement stmt;
+                    if (!instance->db->Prepare(R"(INSERT INTO rec_entries (ulid, sequence, hid, form, parent_ulid,
                                                                        parent_version, root_ulid, anchor, deleted)
-                                              VALUES (?1, -1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                                              ON CONFLICT (ulid) DO UPDATE SET hid = IFNULL(excluded.hid, hid),
-                                                                               anchor = excluded.anchor,
-                                                                               deleted = excluded.deleted)",
-                                          record.ulid, record.hid, record.form, record.parent.ulid,
-                                          record.parent.version >= 0 ? sq_Binding(record.parent.version) : sq_Binding(),
-                                          root_ulid, anchor, record.deleted))
+                                                  VALUES (?1, -1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                                                  ON CONFLICT (ulid) DO UPDATE SET hid = IFNULL(excluded.hid, hid),
+                                                                                   anchor = excluded.anchor,
+                                                                                   deleted = excluded.deleted
+                                                  RETURNING sequence)", &stmt))
                         return false;
+                    sqlite3_bind_text(stmt, 1, record.ulid, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(stmt, 2, record.hid, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(stmt, 3, record.form, -1, SQLITE_STATIC);
+                    sqlite3_bind_text(stmt, 4, record.parent.ulid, -1, SQLITE_STATIC);
+                    if (record.parent.version >= 0) {
+                        sqlite3_bind_int64(stmt, 5, record.parent.version);
+                    } else {
+                        sqlite3_bind_null(stmt, 5);
+                    }
+                    sqlite3_bind_text(stmt, 6, root_ulid, -1, SQLITE_STATIC);
+                    sqlite3_bind_int64(stmt, 7, anchor);
+                    sqlite3_bind_int(stmt, 8, 0 + record.deleted);
 
-                    if (sqlite3_changes(*instance->db)) {
+                    if (!stmt.Step()) {
+                        RG_ASSERT(!stmt.IsValid());
+                        return false;
+                    }
+
+                    int64_t sequence = sqlite3_column_int64(stmt, 0);
+
+                    if (sequence < 0) {
                         int64_t rowid = sqlite3_last_insert_rowid(*instance->db);
 
                         sq_Statement stmt;
