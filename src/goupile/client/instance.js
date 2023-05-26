@@ -812,12 +812,11 @@ function InstanceController() {
 
                 if (sequence === false)
                     sequence = null;
-                if (sequence != null) {
+                if (sequence != null && !Array.isArray(sequence)) {
                     let root = route.form.chain[0];
                     let pages = getAllPages(root.menu);
 
                     sequence = pages.filter(page => page.getOption('sequence', form_record) === sequence).map(page => page.key);
-                    console.log(sequence);
                 }
 
                 nav_sequence = {
