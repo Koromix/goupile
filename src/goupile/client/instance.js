@@ -955,10 +955,10 @@ function InstanceController() {
                         form_builder.action('Continuer', {color: '#2d8261', always: true}, async e => {
                             let url = nav_sequence.next;
 
-                            if (!form_record.saved || form_state.hasChanged())
+                            if (!form_record.saved || form_state.hasChanged()) {
                                 form_builder.triggerErrors();
-                            if (!form_record.saved && form_state.hasChanged())
                                 await saveRecord(form_record, new_hid, form_values, route.page);
+                            }
 
                             self.go(e, url);
                         });
