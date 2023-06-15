@@ -2041,7 +2041,7 @@ function InstanceController() {
             for (let dict of dictionaries) {
                 let records = form_dictionaries[dict];
                 if (records == null)
-                    new_dictionaries[dict] = await loadRecords(null, dict);
+                    records = await loadRecords(null, dict);
                 new_dictionaries[dict] = records;
             }
         }
