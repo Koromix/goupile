@@ -51,7 +51,7 @@ void HandleSendMail(InstanceHolder *instance, const http_RequestInfo &request, h
         return;
     }
 
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
 
     if (!session) {
         LogError("User is not logged in");
@@ -123,7 +123,7 @@ void HandleSendSMS(InstanceHolder *instance, const http_RequestInfo &request, ht
         return;
     }
 
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
 
     if (!session) {
         LogError("User is not logged in");
@@ -187,7 +187,7 @@ void HandleSendSMS(InstanceHolder *instance, const http_RequestInfo &request, ht
 
 void HandleSendTokenize(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io)
 {
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
 
     if (!session) {
         LogError("User is not logged in");

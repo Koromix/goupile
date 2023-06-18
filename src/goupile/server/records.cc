@@ -33,7 +33,7 @@ void HandleRecordLoad(InstanceHolder *instance, const http_RequestInfo &request,
         return;
     }
 
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
     const SessionStamp *stamp = session ? session->GetStamp(instance) : nullptr;
 
     if (!session) {
@@ -176,7 +176,7 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
         return;
     }
 
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
     const SessionStamp *stamp = session ? session->GetStamp(instance) : nullptr;
 
     if (!session) {
@@ -1058,7 +1058,7 @@ void HandleRecordExport(InstanceHolder *instance, const http_RequestInfo &reques
         return;
     }
 
-    RetainPtr<const SessionInfo> session = GetCheckedSession(instance, request, io);
+    RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
 
     if (session) {
         if (!session->HasPermission(instance, UserPermission::DataExport)) {
