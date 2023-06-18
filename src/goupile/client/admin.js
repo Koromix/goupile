@@ -855,7 +855,7 @@ function AdminController() {
                         d.error('phone', 'Format non valide (préfixe obligatoire)');
 
                     if (profile.root)
-                        d.boolean('*root', 'Administrateur', {value: user.root});
+                        d.boolean('*root', 'Super-administrateur', {value: user.root});
                 });
 
                 d.tab('Sécurité', () => {
