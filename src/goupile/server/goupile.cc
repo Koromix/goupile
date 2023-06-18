@@ -394,6 +394,9 @@ static void HandleAdminRequest(const http_RequestInfo &request, http_IO *io)
                     json.Key("title"); json.String("Admin");
                     json.Key("permissions"); json.StartArray();
                     for (Size i = 0; i < RG_LEN(UserPermissionNames); i++) {
+                        if (1 << i == (int)UserPermission::AdminAssign)
+                            continue;
+
                         Span<const char> str = ConvertToJsonName(UserPermissionNames[i], buf);
                         json.String(str.ptr, (size_t)str.len);
                     }

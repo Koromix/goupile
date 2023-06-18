@@ -23,7 +23,7 @@ class InstanceHolder;
 enum class UserPermission {
     AdminCode = 1 << 0,
     AdminPublish = 1 << 1,
-    AdminConfig = 1 << 2,
+    AdminAdmin = 1 << 2,
     AdminAssign = 1 << 3,
     DataLoad = 1 << 4,
     DataSave = 1 << 5,
@@ -34,7 +34,7 @@ enum class UserPermission {
 static const char *const UserPermissionNames[] = {
     "AdminCode",
     "AdminPublish",
-    "AdminConfig",
+    "AdminAdmin",
     "AdminAssign",
     "DataLoad",
     "DataSave",

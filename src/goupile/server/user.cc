@@ -281,6 +281,9 @@ static void WriteProfileJson(const SessionInfo *session, const InstanceHolder *i
 
                 json.Key("permissions"); json.StartObject();
                 for (Size i = 0; i < RG_LEN(UserPermissionNames); i++) {
+                    if (1 << i == (int)UserPermission::AdminAssign)
+                        continue;
+
                     Span<const char> key = ConvertToJsonName(UserPermissionNames[i], buf);
                     json.Key(key.ptr, (size_t)key.len); json.Bool(stamp->permissions & (1 << i));
                 }
@@ -513,7 +516,7 @@ void HandleSessionLogin(InstanceHolder *instance, const http_RequestInfo &reques
                                                                     p.permissions IS NOT NULL))", &stmt))
                 return;
             sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
-            sqlite3_bind_int(stmt, 2, (int)UserPermission::AdminConfig);
+            sqlite3_bind_int(stmt, 2, (int)UserPermission::AdminAdmin);
 
             stmt.Run();
         }
