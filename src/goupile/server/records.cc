@@ -345,8 +345,6 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
         // Save to database
         bool success = instance->db->Transaction([&]() {
             for (const SaveRecord &record: records) {
-                bool updated = false;
-
                 // Retrieve root ULID
                 char root_ulid[32];
                 if (record.parent.ulid) {
@@ -400,23 +398,18 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
                     for (Size i = 0; i < record.fragments.len; i++) {
                         const SaveRecord::Fragment &fragment = record.fragments[i];
 
-                        if (!instance->db->Run(R"(INSERT INTO rec_fragments (ulid, version, type, userid, username,
+                        sq_Statement stmt;
+                        if (!instance->db->Prepare(R"(INSERT INTO rec_fragments (ulid, version, type, userid, username,
                                                                              mtime, fs, page, json, tags)
-                                                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-                                                  ON CONFLICT DO NOTHING)",
-                                              record.ulid, i + 1, fragment.type, session->userid, session->username,
+                                                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                                                      ON CONFLICT DO NOTHING
+                                                      RETURNING anchor)",
+                                              &stmt, record.ulid, i + 1, fragment.type, session->userid, session->username,
                                               fragment.mtime, fragment.fs, fragment.page, fragment.json, fragment.tags.ptr))
                             return false;
-
-                        if (sqlite3_changes(*instance->db)) {
-                            updated = true;
-                        } else {
-                            LogDebug("Ignored conflicting fragment %1 for '%2'", i + 1, record.ulid);
-                            continue;
-                        }
+                        if (!stmt.GetSingleValue(&anchor))
+                            return false;
                     }
-
-                    anchor = sqlite3_last_insert_rowid(*instance->db);
                 } else {
                     sq_Statement stmt;
                     if (!instance->db->Prepare("SELECT seq FROM sqlite_sequence WHERE name = 'rec_fragments'", &stmt))
@@ -429,20 +422,20 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
                     } else {
                         return false;
                     }
-
-                    updated = true;
                 }
 
-                // Insert or update record entry (if needed)
-                if (RG_LIKELY(updated)) {
+                // Insert or update record entry
+                int64_t sequence;
+                int64_t rowid;
+                {
                     sq_Statement stmt;
                     if (!instance->db->Prepare(R"(INSERT INTO rec_entries (ulid, sequence, hid, form, parent_ulid,
-                                                                       parent_version, root_ulid, anchor, deleted)
+                                                                           parent_version, root_ulid, anchor, deleted)
                                                   VALUES (?1, -1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                                                   ON CONFLICT (ulid) DO UPDATE SET hid = IFNULL(excluded.hid, hid),
                                                                                    anchor = excluded.anchor,
                                                                                    deleted = excluded.deleted
-                                                  RETURNING sequence)", &stmt))
+                                                  RETURNING sequence, rowid)", &stmt))
                         return false;
                     sqlite3_bind_text(stmt, 1, record.ulid, -1, SQLITE_STATIC);
                     sqlite3_bind_text(stmt, 2, record.hid, -1, SQLITE_STATIC);
@@ -462,35 +455,32 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
                         return false;
                     }
 
-                    int64_t sequence = sqlite3_column_int64(stmt, 0);
+                    sequence = sqlite3_column_int64(stmt, 0);
+                    rowid = sqlite3_column_int64(stmt, 1);
+                }
 
-                    if (sequence < 0) {
-                        int64_t rowid = sqlite3_last_insert_rowid(*instance->db);
-
+                // Update sequence counter
+                if (sequence < 0) {
+                    int64_t counter;
+                    {
                         sq_Statement stmt;
                         if (!instance->db->Prepare(R"(INSERT INTO seq_counters (type, key, counter)
                                                       VALUES ('record', ?1, 1)
                                                       ON CONFLICT (type, key) DO UPDATE SET counter = counter + 1
-                                                      RETURNING counter)", &stmt))
+                                                      RETURNING counter)", &stmt, record.form))
                             return false;
-                        sqlite3_bind_text(stmt, 1, record.form, -1, SQLITE_STATIC);
-
-                        if (!stmt.Step()) {
-                            RG_ASSERT(!stmt.IsValid());
+                        if (!stmt.GetSingleValue(&counter))
                             return false;
-                        }
+                    }
 
-                        int64_t counter = sqlite3_column_int64(stmt, 0);
-
-                        if (record.hid) {
-                            if (!instance->db->Run("UPDATE rec_entries SET sequence = ?2 WHERE rowid = ?1",
-                                                   rowid, counter))
-                                return false;
-                        } else {
-                            if (!instance->db->Run("UPDATE rec_entries SET sequence = ?2, hid = ?2 WHERE rowid = ?1",
-                                                   rowid, counter, counter))
-                                return false;
-                        }
+                    if (record.hid) {
+                        if (!instance->db->Run("UPDATE rec_entries SET sequence = ?2 WHERE rowid = ?1",
+                                               rowid, counter))
+                            return false;
+                    } else {
+                        if (!instance->db->Run("UPDATE rec_entries SET sequence = ?2, hid = ?2 WHERE rowid = ?1",
+                                               rowid, counter, counter))
+                            return false;
                     }
                 }
             }
