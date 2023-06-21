@@ -155,13 +155,13 @@ SessionStamp *SessionInfo::GetStamp(const InstanceHolder *instance) const
 void SessionInfo::InvalidateStamps()
 {
     std::lock_guard<std::shared_mutex> lock_excl(mutex);
-    stamps_map.Clear();
 
     // We can't clear the array or the allocator because the stamps may
     // be in use so they will waste memory until the session ends.
+    stamps_map.Clear();
 }
 
-void SessionInfo::AuthorizeInstance(const InstanceHolder *instance, uint32_t permissions)
+void SessionInfo::AuthorizeInstance(const InstanceHolder *instance, uint32_t permissions, const char *lock)
 {
     std::lock_guard<std::shared_mutex> lock_excl(mutex);
 
@@ -170,6 +170,7 @@ void SessionInfo::AuthorizeInstance(const InstanceHolder *instance, uint32_t per
     stamp->unique = instance->unique;
     stamp->authorized = true;
     stamp->permissions = permissions;
+    stamp->lock = lock ? DuplicateString(lock, &stamps_alloc).ptr : nullptr;
 
     stamps_map.Set(stamp);
 }
@@ -288,6 +289,10 @@ static void WriteProfileJson(const SessionInfo *session, const InstanceHolder *i
                     json.Key(key.ptr, (size_t)key.len); json.Bool(stamp->permissions & (1 << i));
                 }
                 json.EndObject();
+
+                if (stamp->lock) {
+                    json.Key("lock"); json.Raw(stamp->lock);
+                }
 
                 if (stamp->HasPermission(UserPermission::AdminCode)) {
                     json.Key("develop"); json.Bool(stamp->develop.load(std::memory_order_relaxed));
@@ -598,11 +603,12 @@ void HandleSessionLogin(InstanceHolder *instance, const http_RequestInfo &reques
 }
 
 static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, SessionType type, const char *key,
-                                                const char *username, const char *email, const char *sms, Allocator *alloc)
+                                                const char *username, const char *email, const char *sms,
+                                                const char *lock = nullptr)
 {
     RG_ASSERT(!email || !sms);
 
-    char tmp[128];
+    BlockAllocator temp_alloc;
 
     int64_t userid = 0;
     const char *local_key = nullptr;
@@ -627,7 +633,7 @@ static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, Sessio
                 userid = sqlite3_column_int64(stmt, 0);
                 local_key = (const char *)sqlite3_column_text(stmt, 1);
             } else if (stmt.IsValid()) {
-                local_key = tmp;
+                local_key = (const char *)AllocateRaw(&temp_alloc, 128);
 
                 // Create random local key
                 {
@@ -679,9 +685,9 @@ static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, Sessio
         CopyString(code, session->secret);
 
         smtp_MailContent content;
-        content.subject = Fmt(alloc, "Vérification %1", instance->title).ptr;
-        content.text = Fmt(alloc, "Code: %1", code).ptr;
-        content.html = Fmt(alloc, R"(
+        content.subject = Fmt(&temp_alloc, "Vérification %1", instance->title).ptr;
+        content.text = Fmt(&temp_alloc, "Code: %1", code).ptr;
+        content.html = Fmt(&temp_alloc, R"(
             <div style="text-align: center;">
                 <p style="font-size: 1.3em;">Code de vérification</p>
                 <p style="font-size: 3em; font-weight: bold;">%1</p>
@@ -708,7 +714,7 @@ static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, Sessio
         session->confirm = SessionConfirm::SMS;
         CopyString(code, session->secret);
 
-        const char *message = Fmt(alloc, "Code: %1", code).ptr;
+        const char *message = Fmt(&temp_alloc, "Code: %1", code).ptr;
 
         if (!SendSMS(sms, message))
             return nullptr;
@@ -716,7 +722,7 @@ static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, Sessio
         session = CreateUserSession(type, userid, username, local_key);
     }
 
-    session->AuthorizeInstance(instance, (int)UserPermission::DataSave);
+    session->AuthorizeInstance(instance, (int)UserPermission::DataSave, lock);
 
     return session;
 }
@@ -774,6 +780,7 @@ bool HandleSessionToken(InstanceHolder *instance, const http_RequestInfo &reques
     const char *tid = nullptr;
     const char *username = nullptr;
     HeapArray<const char *> claims;
+    const char *lock = nullptr;
     {
         StreamReader st(json);
         json_Parser parser(&st, &io->allocator);
@@ -798,6 +805,8 @@ bool HandleSessionToken(InstanceHolder *instance, const http_RequestInfo &reques
                     parser.ParseString(&claim);
                     claims.Append(claim);
                 }
+            } else if (TestStr(key, "lock")) {
+                parser.ParseString(&lock);
             } else if (parser.IsValid()) {
                 LogError("Unknown key '%1' in token JSON", key);
                 io->AttachError(422);
@@ -847,26 +856,28 @@ bool HandleSessionToken(InstanceHolder *instance, const http_RequestInfo &reques
         return false;
     }
 
-    RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Token, tid, username, email, sms, &io->allocator);
+    RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Token, tid, username, email, sms, lock);
     if (!session)
         return false;
 
-    bool success = instance->db->Transaction([&]() {
-        RG_ASSERT(session->userid < 0);
+    if (claims.len) {
+        bool success = instance->db->Transaction([&]() {
+            RG_ASSERT(session->userid < 0);
 
-        for (const char *claim: claims) {
-            if (!instance->db->Run(R"(INSERT INTO ins_claims (userid, ulid) VALUES (?1, ?2)
-                                      ON CONFLICT DO NOTHING)", -session->userid, claim))
-                return false;
+            for (const char *claim: claims) {
+                if (!instance->db->Run(R"(INSERT INTO ins_claims (userid, ulid) VALUES (?1, ?2)
+                                          ON CONFLICT DO NOTHING)", -session->userid, claim))
+                    return false;
+            }
+
+            return true;
+        });
+        if (!success) {
+            // The FOREIGN KEY check is deferred so the error happens on COMMIT
+            LogError("Token contains invalid claims");
+            io->AttachError(422);
+            return false;
         }
-
-        return true;
-    });
-    if (!success) {
-        // The FOREIGN KEY check is deferred so the error happens on COMMIT
-        LogError("Token contains invalid claims");
-        io->AttachError(422);
-        return false;
     }
 
     sessions.Open(request, io, session);
@@ -891,6 +902,7 @@ bool HandleSessionKey(InstanceHolder *instance, const http_RequestInfo &request,
                 }
 
                 key = values.FindValue("key", nullptr);
+
                 if (!key) {
                     LogError("Missing 'key' parameter");
                     io->AttachError(422);
@@ -898,7 +910,7 @@ bool HandleSessionKey(InstanceHolder *instance, const http_RequestInfo &request,
                 }
             }
 
-            RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr, &io->allocator);
+            RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr);
             if (!session)
                 return;
 
@@ -912,7 +924,7 @@ bool HandleSessionKey(InstanceHolder *instance, const http_RequestInfo &request,
         if (!key || !key[0])
             return true;
 
-        RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr, &io->allocator);
+        RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr);
         if (!session)
             return false;
 
