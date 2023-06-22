@@ -1897,7 +1897,8 @@ function InstanceController() {
                 if (ulid === 'new') {
                     new_route.ulid = null;
                     new_route.version = null;
-                } else if (form_record == null || !form_record.chain.some(record => record.ulid === ulid)) {
+                } else if (form_record == null || !form_record.chain.some(record => record.ulid === ulid) ||
+                                                  new_route.form.chain.some(form => form.multi)) {
                     new_route.ulid = ulid;
                     new_route.version = null;
                 }
