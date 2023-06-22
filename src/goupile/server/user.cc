@@ -727,211 +727,208 @@ static RetainPtr<SessionInfo> CreateAutoSession(InstanceHolder *instance, Sessio
     return session;
 }
 
-// Returns true if not handled or not relevant, false if an error has occured
-bool HandleSessionToken(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io)
+void HandleSessionToken(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io)
 {
-    Span<const char> token = request.GetQueryValue("token");
-    if (!token.len)
-        return true;
-
     if (!instance->config.token_key) {
         LogError("This instance does not use tokens");
         io->AttachError(403);
-        return false;
+        return;
     }
 
-    // Decode Base64
-    Span<uint8_t> cypher;
-    {
-        cypher = AllocateSpan<uint8_t>(&io->allocator, token.len / 2 + 1);
-
-        size_t cypher_len;
-        if (sodium_hex2bin(cypher.ptr, (size_t)cypher.len, token.ptr, (size_t)token.len,
-                           nullptr, &cypher_len, nullptr) != 0) {
-            LogError("Failed to unseal token");
-            io->AttachError(403);
-            return false;
-        }
-        if (cypher_len < crypto_box_SEALBYTES) {
-            LogError("Failed to unseal token");
-            io->AttachError(403);
-            return false;
-        }
-
-        cypher.len = (Size)cypher_len;
-    }
-
-    // Decode token
-    Span<uint8_t> json;
-    {
-        json = AllocateSpan<uint8_t>(&io->allocator, cypher.len - crypto_box_SEALBYTES);
-
-        if (crypto_box_seal_open((uint8_t *)json.ptr, cypher.ptr, cypher.len,
-                                 instance->config.token_pkey, instance->config.token_skey) != 0) {
-            LogError("Failed to unseal token");
-            io->AttachError(403);
-            return false;
-        }
-    }
-
-    // Parse JSON
-    const char *email = nullptr;
-    const char *sms = nullptr;
-    const char *tid = nullptr;
-    const char *username = nullptr;
-    HeapArray<const char *> claims;
-    const char *lock = nullptr;
-    {
-        StreamReader st(json);
-        json_Parser parser(&st, &io->allocator);
-
-        parser.ParseObject();
-        while (parser.InObject()) {
-            const char *key = "";
-            parser.ParseKey(&key);
-
-            if (TestStr(key, "email")) {
-                parser.ParseString(&email);
-            } else if (TestStr(key, "sms")) {
-                parser.ParseString(&sms);
-            } else if (TestStr(key, "id")) {
-                parser.ParseString(&tid);
-            } else if (TestStr(key, "username")) {
-                parser.ParseString(&username);
-            } else if (TestStr(key, "claims")) {
-                parser.ParseArray();
-                while (parser.InArray()) {
-                    const char *claim = "";
-                    parser.ParseString(&claim);
-                    claims.Append(claim);
-                }
-            } else if (TestStr(key, "lock")) {
-                parser.ParseString(&lock);
-            } else if (parser.IsValid()) {
-                LogError("Unknown key '%1' in token JSON", key);
+    io->RunAsync([=]() {
+        // Read POST values
+        Span <const char> token;
+        {
+            HashMap<const char *, const char *> values;
+            if (!io->ReadPostValues(&io->allocator, &values)) {
                 io->AttachError(422);
-                return false;
-            }
-        }
-        if (!parser.IsValid()) {
-            io->AttachError(422);
-            return false;
-        }
-    }
-
-    // Check token values
-    {
-        bool valid = true;
-
-        if (email && !email[0]) {
-            LogError("Empty email address");
-            valid = false;
-        }
-        if (sms && !sms[0]) {
-            LogError("Empty SMS phone number");
-            valid = false;
-        }
-        if (!tid || !tid[0]) {
-            LogError("Missing or empty token id");
-            valid = false;
-        }
-        if (!username || !username[0]) {
-            username = tid;
-        }
-
-        if (!valid) {
-            io->AttachError(422);
-            return false;
-        }
-    }
-
-    if (email || sms) {
-        // Avoid confirmation event (spam for mails, and SMS are costly)
-        RegisterEvent(request.client_addr, tid);
-    }
-
-    if (CountEvents(request.client_addr, tid) >= BanThreshold) {
-        LogError("You are blocked for %1 minutes after excessive login failures", (BanTime + 59000) / 60000);
-        io->AttachError(403);
-        return false;
-    }
-
-    RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Token, tid, username, email, sms, lock);
-    if (!session)
-        return false;
-
-    if (claims.len) {
-        bool success = instance->db->Transaction([&]() {
-            RG_ASSERT(session->userid < 0);
-
-            for (const char *claim: claims) {
-                if (!instance->db->Run(R"(INSERT INTO ins_claims (userid, ulid) VALUES (?1, ?2)
-                                          ON CONFLICT DO NOTHING)", -session->userid, claim))
-                    return false;
-            }
-
-            return true;
-        });
-        if (!success) {
-            // The FOREIGN KEY check is deferred so the error happens on COMMIT
-            LogError("Token contains invalid claims");
-            io->AttachError(422);
-            return false;
-        }
-    }
-
-    sessions.Open(request, io, session);
-
-    return true;
-}
-
-// Returns true if not handled or not relevant, false if an error has occured
-bool HandleSessionKey(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io)
-{
-    RG_ASSERT(instance->config.auto_key);
-
-    if (request.method == http_RequestMethod::Post) {
-        io->RunAsync([=]() {
-            // Read POST values
-            const char *key;
-            {
-                HashMap<const char *, const char *> values;
-                if (!io->ReadPostValues(&io->allocator, &values)) {
-                    io->AttachError(422);
-                    return;
-                }
-
-                key = values.FindValue("key", nullptr);
-
-                if (!key) {
-                    LogError("Missing 'key' parameter");
-                    io->AttachError(422);
-                    return;
-                }
-            }
-
-            RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr);
-            if (!session)
                 return;
+            }
 
-            sessions.Open(request, io, session);
-        });
+            token = values.FindValue("token", nullptr);
+
+            if (!token.ptr) {
+                LogError("Missing 'token' parameter");
+                io->AttachError(422);
+                return;
+            }
+        }
+
+        // Decode Base64
+        Span<uint8_t> cypher;
+        {
+            cypher = AllocateSpan<uint8_t>(&io->allocator, token.len / 2 + 1);
+
+            size_t cypher_len;
+            if (sodium_hex2bin(cypher.ptr, (size_t)cypher.len, token.ptr, (size_t)token.len,
+                               nullptr, &cypher_len, nullptr) != 0) {
+                LogError("Failed to unseal token");
+                io->AttachError(403);
+                return;
+            }
+            if (cypher_len < crypto_box_SEALBYTES) {
+                LogError("Failed to unseal token");
+                io->AttachError(403);
+                return;
+            }
+
+            cypher.len = (Size)cypher_len;
+        }
+
+        // Decode token
+        Span<uint8_t> json;
+        {
+            json = AllocateSpan<uint8_t>(&io->allocator, cypher.len - crypto_box_SEALBYTES);
+
+            if (crypto_box_seal_open((uint8_t *)json.ptr, cypher.ptr, cypher.len,
+                                     instance->config.token_pkey, instance->config.token_skey) != 0) {
+                LogError("Failed to unseal token");
+                io->AttachError(403);
+                return;
+            }
+        }
+
+        // Parse JSON
+        const char *email = nullptr;
+        const char *sms = nullptr;
+        const char *tid = nullptr;
+        const char *username = nullptr;
+        HeapArray<const char *> claims;
+        const char *lock = nullptr;
+        {
+            StreamReader st(json);
+            json_Parser parser(&st, &io->allocator);
+
+            parser.ParseObject();
+            while (parser.InObject()) {
+                const char *key = "";
+                parser.ParseKey(&key);
+
+                if (TestStr(key, "email")) {
+                    parser.ParseString(&email);
+                } else if (TestStr(key, "sms")) {
+                    parser.ParseString(&sms);
+                } else if (TestStr(key, "id")) {
+                    parser.ParseString(&tid);
+                } else if (TestStr(key, "username")) {
+                    parser.ParseString(&username);
+                } else if (TestStr(key, "claims")) {
+                    parser.ParseArray();
+                    while (parser.InArray()) {
+                        const char *claim = "";
+                        parser.ParseString(&claim);
+                        claims.Append(claim);
+                    }
+                } else if (TestStr(key, "lock")) {
+                    parser.ParseString(&lock);
+                } else if (parser.IsValid()) {
+                    LogError("Unknown key '%1' in token JSON", key);
+                    io->AttachError(422);
+                    return;
+                }
+            }
+            if (!parser.IsValid()) {
+                io->AttachError(422);
+                return;
+            }
+        }
+
+        // Check token values
+        {
+            bool valid = true;
+
+            if (email && !email[0]) {
+                LogError("Empty email address");
+                valid = false;
+            }
+            if (sms && !sms[0]) {
+                LogError("Empty SMS phone number");
+                valid = false;
+            }
+            if (!tid || !tid[0]) {
+                LogError("Missing or empty token id");
+                valid = false;
+            }
+            if (!username || !username[0]) {
+                username = tid;
+            }
+
+            if (!valid) {
+                io->AttachError(422);
+                return;
+            }
+        }
+
+        if (email || sms) {
+            // Avoid confirmation event (spam for mails, and SMS are costly)
+            RegisterEvent(request.client_addr, tid);
+        }
+
+        if (CountEvents(request.client_addr, tid) >= BanThreshold) {
+            LogError("You are blocked for %1 minutes after excessive login failures", (BanTime + 59000) / 60000);
+            io->AttachError(403);
+            return;
+        }
+
+        RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Token, tid, username, email, sms, lock);
+        if (!session)
+            return;
+
+        if (claims.len) {
+            bool success = instance->db->Transaction([&]() {
+                RG_ASSERT(session->userid < 0);
+
+                for (const char *claim: claims) {
+                    if (!instance->db->Run(R"(INSERT INTO ins_claims (userid, ulid) VALUES (?1, ?2)
+                                              ON CONFLICT DO NOTHING)", -session->userid, claim))
+                        return false;
+                }
+
+                return true;
+            });
+            if (!success) {
+                // The FOREIGN KEY check is deferred so the error happens on COMMIT
+                LogError("Token contains invalid claims");
+                io->AttachError(422);
+                return;
+            }
+        }
+
+        sessions.Open(request, io, session);
 
         io->AttachText(200, "Done!");
-        return true;
-    } else {
-        const char *key = request.GetQueryValue(instance->config.auto_key);
-        if (!key || !key[0])
-            return true;
+    });
+}
+
+void HandleSessionKey(InstanceHolder *instance, const http_RequestInfo &request, http_IO *io)
+{
+    io->RunAsync([=]() {
+        // Read POST values
+        const char *key;
+        {
+            HashMap<const char *, const char *> values;
+            if (!io->ReadPostValues(&io->allocator, &values)) {
+                io->AttachError(422);
+                return;
+            }
+
+            key = values.FindValue("key", nullptr);
+
+            if (!key) {
+                LogError("Missing 'key' parameter");
+                io->AttachError(422);
+                return;
+            }
+        }
 
         RetainPtr<SessionInfo> session = CreateAutoSession(instance, SessionType::Key, key, key, nullptr, nullptr);
         if (!session)
-            return false;
+            return;
 
         sessions.Open(request, io, session);
-    }
+    });
 
-    return true;
+    io->AttachText(200, "Done!");
 }
 
 static bool CheckTotp(const SessionInfo &session, InstanceHolder *instance,
