@@ -393,22 +393,27 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
                 }
 
                 // Save record fragments
-                int64_t anchor;
+                int64_t anchor = -1;
                 if (record.fragments.len) {
                     for (Size i = 0; i < record.fragments.len; i++) {
                         const SaveRecord::Fragment &fragment = record.fragments[i];
 
                         sq_Statement stmt;
                         if (!instance->db->Prepare(R"(INSERT INTO rec_fragments (ulid, version, type, userid, username,
-                                                                             mtime, fs, page, json, tags)
+                                                                                 mtime, fs, page, json, tags)
                                                       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
                                                       ON CONFLICT DO NOTHING
                                                       RETURNING anchor)",
                                               &stmt, record.ulid, i + 1, fragment.type, session->userid, session->username,
                                               fragment.mtime, fragment.fs, fragment.page, fragment.json, fragment.tags.ptr))
                             return false;
-                        if (!stmt.GetSingleValue(&anchor))
-                            return false;
+
+                        if (!stmt.GetSingleValue(&anchor)) {
+                            if (!stmt.IsValid())
+                                return false;
+
+                            LogDebug("Ignoring conflicting fragment %1", i);
+                        }
                     }
                 } else {
                     sq_Statement stmt;
@@ -423,6 +428,8 @@ void HandleRecordSave(InstanceHolder *instance, const http_RequestInfo &request,
                         return false;
                     }
                 }
+                if (anchor < 0)
+                    continue;
 
                 // Insert or update record entry
                 int64_t sequence;
