@@ -744,7 +744,8 @@ function AdminController() {
             if (d.values.phone != null && !d.values.phone.startsWith('+'))
                 d.error('phone', 'Format non valide (préfixe obligatoire)');
 
-            d.boolean('*root', 'Super-administrateur', {value: false, untoggle: false});
+            if (profile.root)
+                d.boolean('*root', 'Super-administrateur', {value: false, untoggle: false});
 
             d.action('Créer', {disabled: !d.isValid()}, async () => {
                 let query = new URLSearchParams;
@@ -901,7 +902,8 @@ function AdminController() {
                     query.set('email', d.values.email);
                 if (d.values.phone != null)
                     query.set('phone', d.values.phone);
-                query.set('root', 0 + d.values.root);
+                if (profile.root)
+                    query.set('root', 0 + d.values.root);
 
                 let response = await net.fetch('/admin/api/users/edit', {
                     method: 'POST',
