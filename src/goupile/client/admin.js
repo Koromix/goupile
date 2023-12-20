@@ -86,10 +86,10 @@ function AdminController() {
                 <table class="ui_table fixed">
                     <colgroup>
                         <col/>
-                        ${profile.root ? html`<col style="width: 100px;"/>` : ''}
                         <col style="width: 100px;"/>
                         <col style="width: 100px;"/>
-                        ${profile.root ? html`<col style="width: 100px;"/>` : ''}
+                        <col style="width: 100px;"/>
+                        <col style="width: 100px;"/>
                     </colgroup>
 
                     <tbody>
@@ -101,14 +101,13 @@ function AdminController() {
                                     ${instance.master == null ? instance.key : ''}
                                     (<a href=${'/' + instance.key} target="_blank">accès</a>)
                                 </td>
-                                ${profile.root && instance.master == null ?
-                                    html`<td><a role="button" tabindex="0" @click=${ui.wrapAction(e => runSplitInstanceDialog(e, instance.key))}>Diviser</a></td>` : ''}
-                                ${profile.root && instance.master != null ? html`<td></td>` : ''}
+                                <td><a role="button" tabindex="0" @click=${ui.wrapAction(e => runSplitInstanceDialog(e, instance.key))}>Diviser</a></td>
                                 <td><a role="button" tabindex="0" href=${util.pasteURL('/admin/', { select: instance.key })} 
                                        @click=${ui.wrapAction(instance != selected_instance ? (e => ui.setPanelState('users', true))
                                                                                             : (e => { self.go(e, '/admin/'); e.preventDefault(); }))}>Droits</a></td>
                                 <td><a role="button" tabindex="0" @click=${ui.wrapAction(e => runConfigureInstanceDialog(e, instance))}>Configurer</a></td>
-                                ${profile.root ? html`<td><a role="button" tabindex="0" @click=${ui.wrapAction(e => runDeleteInstanceDialog(e, instance))}>Supprimer</a></td>` : ''}
+                                ${profile.root || instance.master != null ? html`<td><a role="button" tabindex="0" @click=${ui.wrapAction(e => runDeleteInstanceDialog(e, instance))}>Supprimer</a></td>` : ''}
+                                ${!profile.root && instance.master == null ? html`<td></td>` : ''}
                             </tr>
                         `)}
                     </tbody>

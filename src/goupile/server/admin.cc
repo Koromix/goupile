@@ -912,8 +912,8 @@ void HandleInstanceCreate(const http_RequestInfo &request, http_IO *io)
         io->AttachError(401);
         return;
     }
-    if (!session->IsRoot()) {
-        LogError("Non-root users are not allowed to create instances");
+    if (!session->IsAdmin()) {
+        LogError("Non-admin users are not allowed to create instances");
         io->AttachError(403);
         return;
     }
@@ -956,6 +956,34 @@ void HandleInstanceCreate(const http_RequestInfo &request, http_IO *io)
 
             if (!valid) {
                 io->AttachError(422);
+                return;
+            }
+        }
+
+        // Can this admin user touch this instance?
+        if (!session->IsRoot()) {
+            if (!strchr(instance_key, '/')) {
+                LogError("Instance '%1' does not exist", instance_key);
+                io->AttachError(404);
+                return;
+            }
+
+            Span<const char> master = SplitStr(instance_key, '/');
+
+            sq_Statement stmt;
+            if (!gp_domain.db.Prepare(R"(SELECT instance FROM dom_permissions
+                                         WHERE userid = ?1 AND instance = ?2 AND
+                                               permissions & ?3)", &stmt))
+                return;
+            sqlite3_bind_int64(stmt, 1, session->userid);
+            sqlite3_bind_text(stmt, 2, master.ptr, (int)master.len, SQLITE_STATIC);
+            sqlite3_bind_int(stmt, 3, (int)UserPermission::AdminAdmin);
+
+            if (!stmt.Step()) {
+                if (stmt.IsValid()) {
+                    LogError("Instance '%1' does not exist", instance_key);
+                    io->AttachError(404);
+                }
                 return;
             }
         }
@@ -1212,8 +1240,8 @@ void HandleInstanceDelete(const http_RequestInfo &request, http_IO *io)
         io->AttachError(401);
         return;
     }
-    if (!session->IsRoot()) {
-        LogError("Non-root users are not allowed to delete instances");
+    if (!session->IsAdmin()) {
+        LogError("Non-admin users are not allowed to delete instances");
         io->AttachError(403);
         return;
     }
@@ -1239,6 +1267,26 @@ void HandleInstanceDelete(const http_RequestInfo &request, http_IO *io)
             return;
         }
         RG_DEFER_N(ref_guard) { instance->Unref(); };
+
+        // Can this admin user touch this instance?
+        if (!session->IsRoot()) {
+            sq_Statement stmt;
+            if (!gp_domain.db.Prepare(R"(SELECT instance FROM dom_permissions
+                                         WHERE userid = ?1 AND instance = ?2 AND
+                                               permissions & ?3)", &stmt))
+                return;
+            sqlite3_bind_int64(stmt, 1, session->userid);
+            sqlite3_bind_text(stmt, 2, instance->master->key.ptr, -1, SQLITE_STATIC);
+            sqlite3_bind_int(stmt, 3, (int)UserPermission::AdminAdmin);
+
+            if (!stmt.Step()) {
+                if (stmt.IsValid()) {
+                    LogError("Instance '%1' does not exist", instance_key);
+                    io->AttachError(404);
+                }
+                return;
+            }
+        }
 
         bool conflict;
         if (!ArchiveInstances(instance, &conflict)) {
