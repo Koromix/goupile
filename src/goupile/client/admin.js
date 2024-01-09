@@ -897,10 +897,8 @@ function AdminController() {
                 query.set('change_password', 0 + d.values.change_password);
                 query.set('confirm', 0 + d.values.confirm);
                 query.set('reset_secret', 0 + d.values.reset_secret);
-                if (d.values.email != null)
-                    query.set('email', d.values.email);
-                if (d.values.phone != null)
-                    query.set('phone', d.values.phone);
+                query.set('email', d.values.email || '');
+                query.set('phone', d.values.phone || '');
                 if (profile.root)
                     query.set('root', 0 + d.values.root);
 
