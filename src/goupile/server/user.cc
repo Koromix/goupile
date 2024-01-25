@@ -1434,7 +1434,7 @@ void HandleChangeExportKey(InstanceHolder *instance, const http_RequestInfo &req
 
     if (!gp_domain.db.Run(R"(UPDATE dom_permissions SET export_key = ?3
                              WHERE userid = ?1 AND instance = ?2)",
-                          session->userid, instance->key, key_buf.ptr))
+                          session->userid, instance->master->key, key_buf.ptr))
         return;
 
     io->AttachText(200, key_buf.ptr);
