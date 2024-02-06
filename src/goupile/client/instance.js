@@ -624,17 +624,27 @@ function InstanceController() {
                                         if (item.type === 'page') {
                                             let page = item.page;
                                             let url = page.url + `/${row.ulid}`;
+                                            let status = row.status[page.key];
 
                                             if (row.status[page.key] != null) {
-                                                let status = row.status[page.key];
-                                                let tooltip = 'Créé : ' + status.ctime.toLocaleString() +
-                                                              (status.mtime.getTime() != status.ctime.getTime() ? '\nModifié : ' + status.mtime.toLocaleString() : '');
+                                                if (app.mtime) {
+                                                    let tooltip = 'Créé : ' + status.ctime.toLocaleString() +
+                                                                  (status.mtime.getTime() != status.ctime.getTime() ? '\nModifié : ' + status.mtime.toLocaleString() : '');
 
-                                                return html`
-                                                    <td class=${active && page === route.page ? 'saved active' : 'saved'} title=${tooltip}>
-                                                        <a href=${url}>${status.mtime.toLocaleDateString()}</a>
-                                                        ${renderTags(status.tags)}
-                                                    </td>`;
+                                                    return html`
+                                                        <td class=${active && page === route.page ? 'saved active' : 'saved'} title=${tooltip}>
+                                                            <a href=${url}>${status.mtime.toLocaleDateString()}</a>
+                                                            ${renderTags(status.tags)}
+                                                        </td>
+                                                    `;
+                                                } else {
+                                                    return html`
+                                                        <td class=${active && page === route.page ? 'saved active' : 'saved'}>
+                                                            <a href=${url}>Rempli</a>
+                                                            ${renderTags(status.tags)}
+                                                        </td>
+                                                    `;
+                                                }
                                             } else {
                                                 return html`<td class=${active && page === route.page ? 'missing active' : 'missing'}
                                                                 title=${item.title}><a href=${url}>Afficher</a></td>`;
@@ -645,16 +655,26 @@ function InstanceController() {
                                             if (row.status[form.key] != null) {
                                                 let child = row.children[form.key][0];
                                                 let url = form.url + `/${child.ulid}`;
-
                                                 let status = row.status[form.key];
-                                                let tooltip = 'Créé : ' + status.ctime.toLocaleString() +
-                                                              (status.mtime.getTime() != status.ctime.getTime() ? '\nModifié : ' + status.mtime.toLocaleString() : '');
 
-                                                return html`
-                                                    <td class=${active && route.form.chain.includes(form) ? 'saved active' : 'saved'} title=${tooltip}>
-                                                        <a href=${url}>${status.mtime.toLocaleDateString()}</a>
-                                                        ${renderTags(status.tags)}
-                                                    </td>`;
+                                                if (app.mtime) {
+                                                    let tooltip = 'Créé : ' + status.ctime.toLocaleString() +
+                                                                  (status.mtime.getTime() != status.ctime.getTime() ? '\nModifié : ' + status.mtime.toLocaleString() : '');
+
+                                                    return html`
+                                                        <td class=${active && route.form.chain.includes(form) ? 'saved active' : 'saved'} title=${tooltip}>
+                                                            <a href=${url}>${status.mtime.toLocaleDateString()}</a>
+                                                            ${renderTags(status.tags)}
+                                                        </td>
+                                                    `;
+                                                } else {
+                                                    return html`
+                                                        <td class=${active && route.form.chain.includes(form) ? 'saved active' : 'saved'}>
+                                                            <a href=${url}>Rempli</a>
+                                                            ${renderTags(status.tags)}
+                                                        </td>
+                                                    `;
+                                                }
                                             } else {
                                                 let url = form.url + `/${row.ulid}`;
 
