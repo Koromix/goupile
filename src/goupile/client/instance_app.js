@@ -22,6 +22,7 @@ function ApplicationInfo() {
         view: true
     };
     this.mtime = true;
+    this.dashboard = null;
 }
 
 function FormInfo(key, title) {
@@ -88,7 +89,9 @@ function ApplicationBuilder(app) {
 
     this.home = function(home) { app.home = home; };
     this.panel = function(panel, enable) { app.panels[panel] = enable; };
+
     this.mtime = function(mtime) { app.mtime = mtime; };
+    this.dashboard = function(url) { app.dashboard = url; };
 
     this.pushOptions = function(options = {}) {
         options_stack = expandOptions(options);

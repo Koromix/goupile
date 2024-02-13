@@ -577,10 +577,13 @@ function InstanceController() {
                                @input=${e => { data_date = e.target.value ? dates.parse(e.target.value) : null; self.run(); }} />
                     </label>
                     <div style="flex: 1;"></div>
-                    <p>
-                        ${visible_rows.length} ${visible_rows.length < data_rows.length ? `/ ${data_rows.length} ` : ''} ${data_rows.length > 1 ? 'lignes' : 'ligne'}
-                        ${ENV.sync_mode !== 'offline' ? html`(<a @click=${ui.wrapAction(e => syncRecords(true, true))}>synchroniser</a>)` : ''}
-                    </p>
+                    ${app.dashboard == null ? html`
+                        <p>
+                            ${visible_rows.length} ${visible_rows.length < data_rows.length ? `/ ${data_rows.length} ` : ''} ${data_rows.length > 1 ? 'lignes' : 'ligne'}
+                            ${ENV.sync_mode !== 'offline' ? html`(<a @click=${ui.wrapAction(e => syncRecords(true, true))}>synchroniser</a>)` : ''}
+                        </p>
+                    ` : ''}
+                    ${app.dashboard != null ? html`<a href=${app.dashboard} target="_blank">Tableau de bord</a>` : ''}
                 </div>
 
                 <table class="ui_table fixed" id="ins_data"
