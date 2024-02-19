@@ -1057,19 +1057,20 @@ void HandleRecordExport(InstanceHolder *instance, const http_RequestInfo &reques
 
     RetainPtr<const SessionInfo> session = GetNormalSession(instance, request, io);
 
-    if (session) {
-        if (!session->HasPermission(instance, UserPermission::DataExport)) {
-            LogError("User is not allowed to export data");
-            io->AttachError(403);
-            return;
-        }
-    } else if (!instance->slaves.len) {
+    if (!session || !session->HasPermission(instance, UserPermission::DataExport)) {
         const InstanceHolder *master = instance->master;
-        const char *export_key = request.GetHeaderValue("X-Export-Key");
+        const char *export_key = !instance->slaves.len ? request.GetHeaderValue("X-Export-Key") : nullptr;
 
         if (!export_key) {
-            LogError("User is not logged in");
-            io->AttachError(401);
+            if (!session) {
+                LogError("User is not logged in");
+                io->AttachError(401);
+            } else {
+                RG_ASSERT(!session->HasPermission(instance, UserPermission::DataExport));
+
+                LogError("User is not allowed to export data");
+                io->AttachError(403);
+            }
             return;
         }
 
