@@ -2260,17 +2260,24 @@ function InstanceController() {
                 autosave = 5000;
 
             autosave_timer = setTimeout(util.serialize(async () => {
+                autosave_timer = null;
+
                 if (self.hasUnsavedData()) {
                     try {
+                        let prev_state = form_state;
+                        let prev_values = form_values;
+
                         await mutex.chain(() => saveRecord(form_record, new_hid, form_values, route.page, true));
+
+                        // Avoid unwanted value changes while user is doing stuff
+                        form_state = prev_state;
+                        form_values = prev_values;
                     } catch (err) {
                         log.error(err);
                     }
 
                     self.run();
                 }
-
-                autosave_timer = null;
             }, mutex), autosave);
         }
 
