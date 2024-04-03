@@ -8,8 +8,6 @@ It is currently in development and there are no public builds yet. But you can f
 
 We also offer [paid hosting services](https://goupile.org/pricing) based on Goupile suited to your needs, see the pricing page or contact us for more information.
 
-The source code is available under the terms of the [AGPL version 3](https://www.gnu.org/licenses/#AGPL) license.
-
 Visit the [official goupile.org website](https://goupile.org) for more information.
 
 # Source code
