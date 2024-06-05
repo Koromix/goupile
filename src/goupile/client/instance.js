@@ -839,7 +839,17 @@ function InstanceController() {
                     let root = route.form.chain[0];
                     let pages = getAllPages(root.menu);
 
-                    sequence = pages.filter(page => page.getOption('sequence', form_record) === sequence).map(page => page.key);
+                    sequence = pages.filter(page => {
+                        if (page == route.page)
+                            return true;
+
+                        if (page.getOption('sequence', form_record) !== sequence)
+                            return false;
+                        if (!isPageEnabled(page, form_record, true))
+                            return false;
+
+                        return true;
+                    }).map(page => page.key);
                 }
 
                 nav_sequence = {
