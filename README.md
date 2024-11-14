@@ -1,13 +1,22 @@
-# Introduction
+You can find these instructions on the [official web page](https://goupile.org).
 
-Goupile is an open-source electronic data capture application that strives to make form creation and data entry both powerful and easy.
+# Overview
 
-It is licensed under the [AGPL 3 license](https://www.gnu.org/licenses/#AGPL). You can freely download and use the goupile source code. Everyone is granted the right to copy, modify and redistribute it.
+Goupile is an **open-source electronic data capture application** that strives to make form creation and data entry both powerful and easy.
 
-Use the following links for more information:
+It is currently in development and there are no public builds yet. But you can find out more about it or [test the current alpha](https://demo.goupile.fr/) version online.
 
-- Documentation: https://goupile.org/
-- Changelog: https://github.com/Koromix/rygel/blob/master/src/goupile/CHANGELOG.md
+We also offer [paid hosting services](https://goupile.org/pricing) based on Goupile suited to your needs, see the pricing page or contact us for more information.
+
+Visit the [official goupile.org website](https://goupile.org) for more information.
+
+<div align="center">
+    <a href="https://nlnet.nl/" style="border-bottom-color: transparent;"><img src="assets/nlnet.svg" height="60" alt="NLnet Foundation"/></a>&nbsp;&nbsp;&nbsp;
+    <a href="https://nlnet.nl/" style="border-bottom-color: transparent;"><img src="assets/ngi0core.svg" height="60" alt="NGI Zero Core"/></a>
+    <br><br>
+</div>
+
+This project is sponsored by NLnet: https://nlnet.nl/project/Goupile/
 
 # Source code
 
