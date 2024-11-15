@@ -4,11 +4,7 @@ You can find these instructions on the [official web page](https://goupile.org).
 
 Goupile is an **open-source electronic data capture application** that strives to make form creation and data entry both powerful and easy.
 
-It is currently in development and there are no public builds yet. But you can find out more about it or [test the current alpha](https://demo.goupile.fr/) version online.
-
-We also offer [paid hosting services](https://goupile.org/pricing) based on Goupile suited to your needs, see the pricing page or contact us for more information.
-
-Visit the [official goupile.org website](https://goupile.org) for more information.
+This project is sponsored by NLnet: https://nlnet.nl/project/Goupile/
 
 <div align="center">
     <a href="https://nlnet.nl/" style="border-bottom-color: transparent;"><img src="assets/nlnet.svg" height="60" alt="NLnet Foundation"/></a>&nbsp;&nbsp;&nbsp;
@@ -16,7 +12,14 @@ Visit the [official goupile.org website](https://goupile.org) for more informati
     <br><br>
 </div>
 
-This project is sponsored by NLnet: https://nlnet.nl/project/Goupile/
+You can test it directly on our online demo instance : <a href="https://demo.goupile.fr/" target="_blank">test online demo</a>
+
+> [!WARNING]
+> Please note that sessions and data in the demo version are regularly reset to zero!
+
+We also offer [paid hosting services](https://goupile.org/pricing) based on Goupile suited to your needs, see the pricing page or contact us for more information.
+
+Visit the [official goupile.org website](https://goupile.org) for more information.
 
 # Source code
 
